@@ -7,8 +7,19 @@ import { FaCommentMedical, FaTimes } from "react-icons/fa";
 
 const Chatbot = () => {
 
+    const timestamp = Date.now();
+    const date = new Date(timestamp);
+
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+
+    const formattedHours = hours % 12 || 12; // Convert 0 to 12 for midnight
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+
+    const timeString = `${formattedHours}:${formattedMinutes} ${ampm}`;
+
     const generateSessionId = () => {
-        const timestamp = Date.now();
         const randomNum = Math.floor(Math.random() * 1000000);
         const str = `${timestamp}-${randomNum}`;
         let hash = 0;
@@ -120,7 +131,7 @@ const Chatbot = () => {
                             <div key={index} className={`chat-message ${msg.role === "user" ? "message-user" : "message-system"}`}>
                                 {msg.content}
                             </div>
-                            <span className="deliver-time">11.30</span>
+                            <span className="deliver-time">{timeString}</span>
                         </>
                     ))}
                     {typing && (
