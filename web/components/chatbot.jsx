@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import "../styles/chatbot.css"; 
+import { IoIosSend } from "react-icons/io";
+import { FaCommentMedical, FaTimes } from "react-icons/fa";
 
 const Chatbot = () => {
 
@@ -114,9 +116,12 @@ const Chatbot = () => {
                 </div>
                 <div className="chat-messages">
                     {messages.map((msg, index) => (
-                        <div key={index} className={`chat-message ${msg.role}`}>
-                            {msg.content}
-                        </div>
+                        <>
+                            <div key={index} className={`chat-message ${msg.role === "user" ? "message-user" : "message-system"}`}>
+                                {msg.content}
+                            </div>
+                            <span className="deliver-time">11.30</span>
+                        </>
                     ))}
                     {typing && (
                         <div className="typing-indicator" id="typing-indicator">
@@ -135,8 +140,8 @@ const Chatbot = () => {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                     />
-                    <button className="btn btn-primary" onClick={sendMessage}>
-                        <i className="fas fa-paper-plane" />
+                    <button className={`btn btn-primary ${typing ? "disabled-send-btn":""}`} onClick={sendMessage} disabled={typing} >
+                        <IoIosSend size={30} color="#e9f3ff"/>
                     </button>
                 </div>
             </div>
@@ -146,8 +151,8 @@ const Chatbot = () => {
                 className={`chat-button ${visible ? "active" : ""}`}
                 onClick={() => setVisible(!visible)}
             >
-                <i className="fas fa-comment-medical chat-icon" />
-                <i className="fas fa-times close-icon" />
+                <FaCommentMedical className="chat-icon" />
+                <FaTimes className="close-icon" />
             </button>
         </div>
     );
