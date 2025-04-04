@@ -8,12 +8,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddSingleton<SemanticKernelService>();
-
-// Add DbContext with PostgreSQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddSingleton<SemanticKernelService>();
+
+builder.Services.AddScoped<ChatService>();
+
+builder.Services.AddSession();
+builder.Services.AddDistributedMemoryCache();
+
+// Add DbContext with PostgreSQL
+
 
 var app = builder.Build();
 
@@ -30,7 +37,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthorization();
-
+app.UseSession();
 // Remove or correct the MapStaticAssets call if it's not a valid method
 // app.MapStaticAssets();
 

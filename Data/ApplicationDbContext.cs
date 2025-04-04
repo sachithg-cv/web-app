@@ -13,7 +13,7 @@ namespace WebChatBot.Data
         {
         }
 
-        public DbSet<ChatMessage> ChatMessages;
+        public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
 
         // Define your DbSet properties for your models here
         // public DbSet<YourModel> YourModels { get; set; }
@@ -25,6 +25,8 @@ namespace WebChatBot.Data
             modelBuilder.Entity<ChatMessage>(entity => 
             {
                 // Configure Id as auto-incrementing primary key
+                entity.ToTable("ChatMessage"); 
+                
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id)
                     .UseIdentityColumn() // This sets up auto-increment
@@ -34,8 +36,8 @@ namespace WebChatBot.Data
                 entity.HasIndex(m => m.SessionId);
                 
                 // Optional: configure other properties
-                entity.Property(e => e.message).IsRequired();
-                entity.Property(e => e.sender).IsRequired();
+                entity.Property(e => e.Message).IsRequired();
+                entity.Property(e => e.Sender).IsRequired();
             });
         }
     }

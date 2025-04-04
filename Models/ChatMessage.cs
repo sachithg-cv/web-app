@@ -11,9 +11,9 @@ namespace WebChatBot.Models
 
         public string SessionId {get; set; }
 
-        public string message { get; set; }
+        public string Message { get; set; }
 
-        public string sender { get; set; }
+        public string Sender { get; set; }
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 

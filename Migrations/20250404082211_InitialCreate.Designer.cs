@@ -12,7 +12,7 @@ using WebChatBot.Data;
 namespace WebChatBot.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250404065622_InitialCreate")]
+    [Migration("20250404082211_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -33,6 +33,14 @@ namespace WebChatBot.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sender")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("SessionId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -40,19 +48,11 @@ namespace WebChatBot.Migrations
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("message")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("sender")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
 
                     b.HasIndex("SessionId");
 
-                    b.ToTable("ChatMessage");
+                    b.ToTable("ChatMessage", (string)null);
                 });
 #pragma warning restore 612, 618
         }
