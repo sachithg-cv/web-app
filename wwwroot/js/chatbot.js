@@ -22,9 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWindow.classList.toggle('active');
         
         // Initialize connection the first time chat is opened
-        if (chatButton.classList.contains('active') && !connection) {
-            initializeSignalRConnection();
-        }
+        // if (chatButton.classList.contains('active') && !connection) {
+        //     initializeSignalRConnection();
+        // }
         
         // Focus on input when chat is opened
         if (chatWindow.classList.contains('active')) {
@@ -49,44 +49,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Initialize SignalR connection
-    function initializeSignalRConnection() {
-        // Create the connection
-        connection = new signalR.HubConnectionBuilder()
-            .withUrl("/chatHub")
-            .withAutomaticReconnect()
-            .build();
+    // function initializeSignalRConnection() {
+    //     // Create the connection
+    //     connection = new signalR.HubConnectionBuilder()
+    //         .withUrl("/chatHub")
+    //         .withAutomaticReconnect()
+    //         .build();
         
-        // Start the connection
-        connection.start()
-            .then(() => {
-                console.log("SignalR Connected!");
+    //     // Start the connection
+    //     connection.start()
+    //         .then(() => {
+    //             console.log("SignalR Connected!");
                 
-                // Join the chat session
-                connection.invoke("JoinSession", sessionId)
-                    .catch(err => console.error("Error joining session:", err));
-            })
-            .catch(err => console.error("Error connecting:", err));
+    //             // Join the chat session
+    //             connection.invoke("JoinSession", sessionId)
+    //                 .catch(err => console.error("Error joining session:", err));
+    //         })
+    //         .catch(err => console.error("Error connecting:", err));
         
-        // Handle received messages
-        connection.on("ReceiveMessage", (role, content) => {
-            addMessageToChat(role, content);
+    //     // Handle received messages
+    //     connection.on("ReceiveMessage", (role, content) => {
+    //         addMessageToChat(role, content);
             
-            // Hide typing indicator
-            typingIndicator.style.display = 'none';
+    //         // Hide typing indicator
+    //         typingIndicator.style.display = 'none';
             
-            // Scroll to bottom
-            scrollToBottom();
+    //         // Scroll to bottom
+    //         scrollToBottom();
             
-            // Enable input
-            enableUserInput();
-        });
-    }
+    //         // Enable input
+    //         enableUserInput();
+    //     });
+    // }
     
     // Send message function
     function sendMessage() {
         const message = messageInput.value.trim();
         
-        if (message && connection) {
+        if (message) {
             // Disable input while processing
             disableUserInput();
             
