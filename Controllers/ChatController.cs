@@ -30,8 +30,9 @@ namespace WebChatBot.Controllers
         [HttpPost]
         public async Task<ActionResult> GetChatResponseAsync([FromBody] ChatRequest request)
         {
+            var messages = await _chatService.GetMessagesAsync(request.SessionId);
             await _chatService.AddMessageAsync(request.SessionId,request.Message, "user");
-            var response = await _semanticKernelService.GetChatResponseAsync(request.Message);
+            var response = await _semanticKernelService.GetChatResponseAsync(request.Message, messages);
             await _chatService.AddMessageAsync(request.SessionId,response, "system");
             return Ok(response);
         }
