@@ -236,5 +236,74 @@ namespace WebChatBot.Plugins
                 });
             }
         }
+
+        [KernelFunction, Description("Get doctors by specialty")]
+        public async Task<string> GetDoctorsBySpecialty(
+            [Description("The medical specialty to find doctors for")]
+            string specialty)
+        {
+            try
+            {
+                var doctors = await _appointmentService.GetDoctorsBySpecialtyAsync(specialty);
+                
+                if (doctors.Count == 0)
+                {
+                    return JsonSerializer.Serialize(new {
+                        specialty = specialty,
+                        found = false,
+                        message = $"No doctors found for the specialty '{specialty}'. Please check if the specialty name is correct.",
+                        doctors = new List<object>()
+                    });
+                }
+
+                return JsonSerializer.Serialize(new {
+                    specialty = specialty,
+                    found = true,
+                    message = $"Found {doctors.Count} doctor(s) specializing in {specialty}",
+                    doctors = doctors
+                });
+            }
+            catch (Exception ex)
+            {
+                return JsonSerializer.Serialize(new {
+                    specialty = specialty,
+                    found = false,
+                    message = $"Error finding doctors: {ex.Message}",
+                    doctors = new List<object>()
+                });
+            }
+        }
+
+        [KernelFunction, Description("Get all available specialties with their doctors")]
+        public async Task<string> GetAllSpecialtiesWithDoctors()
+        {
+            try
+            {
+                var specialties = await _appointmentService.GetAllSpecialtiesWithDoctorsAsync();
+                
+                if (specialties.Count == 0)
+                {
+                    return JsonSerializer.Serialize(new {
+                        found = false,
+                        message = "No specialties or doctors found in our system.",
+                        specialties = new List<object>()
+                    });
+                }
+
+                return JsonSerializer.Serialize(new {
+                    found = true,
+                    message = $"Found {specialties.Count} specialties with their doctors",
+                    specialties = specialties
+                });
+            }
+            catch (Exception ex)
+            {
+                return JsonSerializer.Serialize(new {
+                    found = false,
+                    message = $"Error fetching specialties and doctors: {ex.Message}",
+                    specialties = new List<object>()
+                });
+            }
+        }
     }
 }

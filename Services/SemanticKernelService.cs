@@ -37,6 +37,7 @@ Follow these guidelines:
 4. Be conversational and empathetic, understanding that medical issues can be sensitive.
 5. If the user asks questions about medical conditions, politely explain that you're an appointment scheduling assistant and cannot provide medical advice.
 6. If the user wants to reschedule or cancel, ask for the appointment details and confirm the change.
+7. If the user asks about doctors for a specific specialty, provide information about our available doctors.
 
 Available specialties at our clinic:
 - General Practice
@@ -55,7 +56,9 @@ You can use tools to help schedule appointments:
 - Extract appointment details from the conversation
 - Validate if all required appointment information is present
 - Check availability for a specialty
-- Book appointments when all details are complete";
+- Book appointments when all details are complete
+- Look up doctors by specialty
+- Get information about all available specialties and doctors";
 
         public SemanticKernelService(IConfiguration configuration, AppointmentService appointmentService)
         {
@@ -210,6 +213,26 @@ You can use tools to help schedule appointments:
             {
                 ["confirmationCode"] = confirmationCode
             });
+            
+            return result.GetValue<string>();
+        }
+
+        public async Task<string> GetDoctorsBySpecialtyAsync(string specialty)
+        {
+            var function = _kernel.Plugins.GetFunction("AppointmentPlugin", "GetDoctorsBySpecialty");
+            var result = await _kernel.InvokeAsync(function, new KernelArguments
+            {
+                ["specialty"] = specialty
+            });
+            
+            return result.GetValue<string>();
+        }
+
+        // Method to get all specialties with their doctors
+        public async Task<string> GetAllSpecialtiesWithDoctorsAsync()
+        {
+            var function = _kernel.Plugins.GetFunction("AppointmentPlugin", "GetAllSpecialtiesWithDoctors");
+            var result = await _kernel.InvokeAsync(function);
             
             return result.GetValue<string>();
         }

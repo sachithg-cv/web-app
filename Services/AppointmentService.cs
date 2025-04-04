@@ -225,6 +225,71 @@ namespace WebChatBot.Services
                 Status = appointment.Status
             };
         }
+
+        /// <summary>
+        /// Get all doctors for a specific specialty
+        /// </summary>
+        public async Task<List<DoctorInfo>> GetDoctorsBySpecialtyAsync(string specialtyName)
+        {
+            try
+            {
+                var doctors = await _context.Doctors
+                    .Include(d => d.Specialty)
+                    .Where(d => 
+                        d.IsActive && 
+                        d.Specialty.IsActive &&
+                        EF.Functions.ILike(d.Specialty.Name, $"%{specialtyName}%"))
+                    .Select(d => new DoctorInfo
+                    {
+                        DoctorId = d.DoctorId,
+                        Name = d.Name,
+                        SpecialtyName = d.Specialty.Name
+                    })
+                    .ToListAsync();
+
+                return doctors;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching doctors by specialty: {ex.Message}");
+                return new List<DoctorInfo>();
+            }
+        }
+
+        /// <summary>
+        /// Get all available specialties with their doctors
+        /// </summary>
+        public async Task<List<SpecialtyWithDoctors>> GetAllSpecialtiesWithDoctorsAsync()
+        {
+            try
+            {
+                var specialties = await _context.Specialties
+                    .Where(s => s.IsActive)
+                    .Select(s => new SpecialtyWithDoctors
+                    {
+                        SpecialtyId = s.SpecialtyId,
+                        Name = s.Name,
+                        Description = s.Description,
+                        Doctors = s.Doctors
+                            .Where(d => d.IsActive)
+                            .Select(d => new DoctorInfo
+                            {
+                                DoctorId = d.DoctorId,
+                                Name = d.Name,
+                                SpecialtyName = s.Name
+                            })
+                            .ToList()
+                    })
+                    .ToListAsync();
+
+                return specialties;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching specialties with doctors: {ex.Message}");
+                return new List<SpecialtyWithDoctors>();
+            }
+        }
     }
 
     // DTO classes for appointment operations
@@ -258,5 +323,20 @@ namespace WebChatBot.Services
         public string Reason { get; set; }
         public string Status { get; set; }
         public string Message { get; set; }
+    }
+
+    public class DoctorInfo
+    {
+        public int DoctorId { get; set; }
+        public string Name { get; set; }
+        public string SpecialtyName { get; set; }
+    }
+
+    public class SpecialtyWithDoctors
+    {
+        public int SpecialtyId { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public List<DoctorInfo> Doctors { get; set; } = new List<DoctorInfo>();
     }
 }
