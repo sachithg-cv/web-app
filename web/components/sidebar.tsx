@@ -34,6 +34,16 @@ const menuItems = [
     href: "/settings",
     icon: Settings,
   },
+  {
+    name: "Patient Messages",
+    href: "/patient",
+    icon: Settings,
+  },
+  {
+    name: "Doctor Messages",
+    href: "/admin",
+    icon: Settings,
+  },
 ]
 
 export function Sidebar() {
