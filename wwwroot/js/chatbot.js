@@ -7,11 +7,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('send-button');
     const chatMessages = document.getElementById('chat-messages');
     const typingIndicator = document.getElementById('typing-indicator');
+    
+    let sessionId = localStorage.getItem('chatSessionId');
+    
+    // If no session ID exists, generate one and store it
+    if (!sessionId) {
+        sessionId = generateHashString();
+        localStorage.setItem('chatSessionId', sessionId);
+        console.log("Generated new session ID:", sessionId);
+    } else {
+        console.log("Using existing session ID from localStorage:", sessionId);
+    }
 
     
     // Generate a random session ID or get from local storage
-    const sessionId = localStorage.getItem('chatSessionId') || generateSessionId();
-    localStorage.setItem('chatSessionId', sessionId);
+    // const sessionId = localStorage.getItem('chatSessionId') || generateSessionId();
+    // localStorage.setItem('chatSessionId', sessionId);
     
     // SignalR connection
     let connection = null;
@@ -25,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // if (chatButton.classList.contains('active') && !connection) {
         //     initializeSignalRConnection();
         // }
+        fetchPreviousMessages();
         
         // Focus on input when chat is opened
         if (chatWindow.classList.contains('active')) {
@@ -48,6 +60,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    function generateHashString() {
+        // Create a random string with timestamp for uniqueness
+        const timestamp = new Date().getTime();
+        const randomNum = Math.floor(Math.random() * 1000000);
+        const baseString = `${timestamp}-${randomNum}`;
+        
+        // Simple hash function
+        let hash = 0;
+        for (let i = 0; i < baseString.length; i++) {
+            const char = baseString.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        
+        // Convert to hex string and ensure it's positive
+        return Math.abs(hash).toString(16);
+    }
+
+    function fetchPreviousMessages() {
+        // First request to get sessionId
+        var chatSettings = {
+            "url": `http://localhost:5145/api/chat?sessionId=${sessionId}`,
+            "method": "GET",
+            "timeout": 0,
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "data": "\r\n",
+        };
+        
+        // Using promise to handle sequential requests
+        $.ajax(chatSettings)
+            .done(function(response) {
+                console.log("Session response:", response);
+                
+                if (response && response.length > 0) {
+                    response.forEach(element => {
+                        addMessageToChat(element.sender, element.message);
+                    });
+                }
+            });
+            
+    }
     // Initialize SignalR connection
     // function initializeSignalRConnection() {
     //     // Create the connection
@@ -111,7 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   "Content-Type": "application/json"
                 },
                 "data": JSON.stringify({
-                  "message": message
+                  "message": message,
+                  "sessionId": sessionId
                 }),
               };
               

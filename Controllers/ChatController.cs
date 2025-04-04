@@ -30,10 +30,9 @@ namespace WebChatBot.Controllers
         [HttpPost]
         public async Task<ActionResult> GetChatResponseAsync([FromBody] ChatRequest request)
         {
-            var sessionId = HttpContext.Session.Id;
-            await _chatService.AddMessageAsync(sessionId,request.Message, "user");
+            await _chatService.AddMessageAsync(request.SessionId,request.Message, "user");
             var response = await _semanticKernelService.GetChatResponseAsync(request.Message);
-            await _chatService.AddMessageAsync(sessionId,response, "system");
+            await _chatService.AddMessageAsync(request.SessionId,response, "system");
             return Ok(response);
         }
     }
@@ -41,5 +40,6 @@ namespace WebChatBot.Controllers
     public class ChatRequest
     {
         public string Message { get; set; } = string.Empty;
+        public string SessionId { get; set; } = string.Empty;
     }
 }
