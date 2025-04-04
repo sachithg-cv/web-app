@@ -12,9 +12,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddSingleton<SemanticKernelService>();
+builder.Services.AddScoped<SemanticKernelService>();
 
 builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<AppointmentService>();
+builder.Services.AddScoped<TimeSlotGenerator>();
 
 builder.Services.AddSession();
 builder.Services.AddDistributedMemoryCache();
@@ -46,5 +48,7 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
     // Remove the WithStaticAssets call if it's not a valid method
     // .WithStaticAssets();
+
+//await DbInitializer.SeedData(app.Services);
 
 app.Run();

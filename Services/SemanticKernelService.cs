@@ -19,44 +19,47 @@ namespace WebChatBot.Services
 
         private readonly KernelPlugin _appointmentPlugin;
 
-        private const string SYSTEM_PROMPT = @"You are an intelligent appointment scheduling assistant for a medical clinic. 
-        Your primary goal is to help patients schedule appointments with appropriate doctors.
+        private readonly AppointmentService _appointmentService;
 
-        Follow these guidelines:
-        1. If this is a new conversation, greet the user and ask how you can help with scheduling.
-        2. Collect the following information (if not already provided):
-        - Patient's name
-        - Doctor specialty needed (e.g., cardiologist, dermatologist, general practitioner)
-        - Preferred date and time for the appointment
-        - Reason for the visit (brief description of symptoms or concerns)
-        - Patient's contact information (phone or email)
+        private const string SYSTEM_PROMPT =  @"You are an intelligent appointment scheduling assistant for a medical clinic. 
+Your primary goal is to help patients schedule appointments with appropriate doctors.
 
-        3. Once you have all necessary information, summarize the appointment details and confirm with the patient.
-        4. Be conversational and empathetic, understanding that medical issues can be sensitive.
-        5. If the user asks questions about medical conditions, politely explain that you're an appointment scheduling assistant and cannot provide medical advice.
-        6. If the user wants to reschedule or cancel, ask for the appointment details and confirm the change.
+Follow these guidelines:
+1. If this is a new conversation, greet the user and ask how you can help with scheduling.
+2. Collect the following information (if not already provided):
+   - Patient's name
+   - Doctor specialty needed (e.g., cardiologist, dermatologist, general practitioner)
+   - Preferred date and time for the appointment
+   - Reason for the visit (brief description of symptoms or concerns)
+   - Patient's contact information (phone or email)
 
-        Available specialties at our clinic:
-        - General Practice
-        - Cardiology
-        - Dermatology
-        - Orthopedics
-        - Pediatrics
-        - Neurology
-        - Gynecology
-        - Ophthalmology
-        - ENT (Ear, Nose, Throat)
+3. Once you have all necessary information, summarize the appointment details and confirm with the patient.
+4. Be conversational and empathetic, understanding that medical issues can be sensitive.
+5. If the user asks questions about medical conditions, politely explain that you're an appointment scheduling assistant and cannot provide medical advice.
+6. If the user wants to reschedule or cancel, ask for the appointment details and confirm the change.
 
-        Available appointment hours: Monday-Friday, 9:00 AM to 5:00 PM
+Available specialties at our clinic:
+- General Practice
+- Cardiology
+- Dermatology
+- Orthopedics
+- Pediatrics
+- Neurology
+- Gynecology
+- Ophthalmology
+- ENT (Ear, Nose, Throat)
 
-        You can use tools to help schedule appointments:
-        - Extract appointment details from the conversation
-        - Validate if all required appointment information is present
-        - Check availability for a specialty
-        - Book appointments when all details are complete";
+Available appointment hours: Monday-Friday, 9:00 AM to 5:00 PM
 
-        public SemanticKernelService(IConfiguration configuration)
+You can use tools to help schedule appointments:
+- Extract appointment details from the conversation
+- Validate if all required appointment information is present
+- Check availability for a specialty
+- Book appointments when all details are complete";
+
+        public SemanticKernelService(IConfiguration configuration, AppointmentService appointmentService)
         {
+            _appointmentService = appointmentService;
             string apiKey = configuration["SemanticKernel:ApiKey"];
             string endPoint = configuration["SemanticKernel:Endpoint"];
             string deploymentName = configuration["SemanticKernel:DeploymentName"];
@@ -71,7 +74,7 @@ namespace WebChatBot.Services
             _kernel = builder.Build();
 
             // Register the appointment plugin
-            var appointmentPlugin = new AppointmentPlugin(_kernel);
+            var appointmentPlugin = new AppointmentPlugin(_kernel, _appointmentService);
             _appointmentPlugin = KernelPluginFactory.CreateFromObject(appointmentPlugin, "AppointmentPlugin");
             _kernel.Plugins.Add(_appointmentPlugin);
         }
@@ -126,8 +129,22 @@ namespace WebChatBot.Services
                 var validation = JsonSerializer.Deserialize<JsonElement>(validationResult.GetValue<string>());
                 bool isValid = validation.GetProperty("isValid").GetBoolean();
                 
-                // If the appointment is valid, we can store this information for later
-                // In a real app, you might store this in a session or database
+                // If validation shows specialty is set, we can proactively check availability
+                if (isValid)
+                {
+                    var appointment = JsonSerializer.Deserialize<AppointmentDetails>(appointmentJson);
+                    
+                    // Proactively check availability for the specialty
+                    if (appointment.Specialty != "unknown")
+                    {
+                        var availabilityFunction = _kernel.Plugins.GetFunction("AppointmentPlugin", "CheckAvailability");
+                        await _kernel.InvokeAsync(availabilityFunction, new KernelArguments
+                        {
+                            ["specialty"] = appointment.Specialty,
+                            ["date"] = ""
+                        });
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -161,7 +178,7 @@ namespace WebChatBot.Services
          // Method to directly check availability
         public async Task<string> CheckAvailabilityAsync(string specialty, string date = "")
         {
-            var function = _kernel.Plugins.GetFunction("AppointmentPlugin", "CheckAvailability");
+             var function = _kernel.Plugins.GetFunction("AppointmentPlugin", "CheckAvailability");
             var result = await _kernel.InvokeAsync(function, new KernelArguments
             {
                 ["specialty"] = specialty,
@@ -172,14 +189,26 @@ namespace WebChatBot.Services
         }
 
         // Method to directly book an appointment
-        public async Task<string> BookAppointmentAsync(AppointmentDetails appointment)
+        public async Task<string> BookAppointmentAsync(string patientName, string contactInfo, int slotId, string reason)
         {
-            string appointmentJson = JsonSerializer.Serialize(appointment);
-            
             var function = _kernel.Plugins.GetFunction("AppointmentPlugin", "BookAppointment");
             var result = await _kernel.InvokeAsync(function, new KernelArguments
             {
-                ["appointmentJson"] = appointmentJson
+                ["patientName"] = patientName,
+                ["contactInfo"] = contactInfo,
+                ["slotId"] = slotId,
+                ["reason"] = reason
+            });
+            
+            return result.GetValue<string>();
+        }
+
+        public async Task<string> GetAppointmentByCodeAsync(string confirmationCode)
+        {
+            var function = _kernel.Plugins.GetFunction("AppointmentPlugin", "GetAppointmentByCode");
+            var result = await _kernel.InvokeAsync(function, new KernelArguments
+            {
+                ["confirmationCode"] = confirmationCode
             });
             
             return result.GetValue<string>();

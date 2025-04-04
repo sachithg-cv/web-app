@@ -14,9 +14,11 @@ namespace WebChatBot.Data
         }
 
         public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
-
-        // Define your DbSet properties for your models here
-        // public DbSet<YourModel> YourModels { get; set; }
+        public DbSet<Specialty> Specialties { get; set; }
+        public DbSet<Doctor> Doctors { get; set; }
+        public DbSet<TimeSlot> TimeSlots { get; set; }
+        public DbSet<Patient> Patients { get; set; }
+        public DbSet<Appointment> Appointments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -38,6 +40,32 @@ namespace WebChatBot.Data
                 // Optional: configure other properties
                 entity.Property(e => e.Message).IsRequired();
                 entity.Property(e => e.Sender).IsRequired();
+
+                 modelBuilder.Entity<TimeSlot>()
+                .HasIndex(ts => new { ts.DoctorId, ts.StartTime, ts.EndTime })
+                .IsUnique();
+                
+            // Configure one-to-one relationship between TimeSlot and Appointment
+            modelBuilder.Entity<TimeSlot>()
+                .HasOne(ts => ts.Appointment)
+                .WithOne(a => a.Slot)
+                .HasForeignKey<Appointment>(a => a.SlotId);
+
+            // Configure relationships between entities
+            modelBuilder.Entity<Doctor>()
+                .HasOne(d => d.Specialty)
+                .WithMany(s => s.Doctors)
+                .HasForeignKey(d => d.SpecialtyId);
+
+            modelBuilder.Entity<TimeSlot>()
+                .HasOne(ts => ts.Doctor)
+                .WithMany(d => d.TimeSlots)
+                .HasForeignKey(ts => ts.DoctorId);
+
+            modelBuilder.Entity<Appointment>()
+                .HasOne(a => a.Patient)
+                .WithMany(p => p.Appointments)
+                .HasForeignKey(a => a.PatientId);
             });
         }
     }

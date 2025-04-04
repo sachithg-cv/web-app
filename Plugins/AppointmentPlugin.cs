@@ -4,22 +4,22 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using WebChatBot.Models;
+using WebChatBot.Services;
 
 namespace WebChatBot.Plugins
 {
     public class AppointmentPlugin
     {
         private readonly Kernel _kernel;
+        private readonly AppointmentService _appointmentService;
 
-        // In a real application, this would be a database repository
-        private static List<AppointmentDetails> _appointments = new List<AppointmentDetails>();
-
-        public AppointmentPlugin(Kernel kernel)
+        public AppointmentPlugin(Kernel kernel, AppointmentService appointmentService)
         {
             _kernel = kernel;
+            _appointmentService = appointmentService;
         }
 
-        [KernelFunction, Description("Extract appointment details from conversation")]
+         [KernelFunction, Description("Extract appointment details from conversation")]
         public async Task<string> ExtractAppointmentDetails(
             [Description("The full conversation text between the user and assistant")]
             string conversationText)
@@ -38,20 +38,42 @@ namespace WebChatBot.Plugins
                 Only include information explicitly mentioned in the conversation.
                 If information isn't provided, use ""unknown"" as the value.
                 Return ONLY valid JSON, no other text.",
-                
                 new Microsoft.SemanticKernel.Connectors.OpenAI.OpenAIPromptExecutionSettings { 
-                    Temperature = 0.0,
-                    //ResponseFormat = "json_object"
+                    Temperature = 0.0
+                    // ResponseFormat = "json_object" - commented out to avoid preview API warning
                 });
-                
+
             // Execute the extractor function with the conversation text
             var result = await extractorFunction.InvokeAsync(_kernel, new KernelArguments { ["input"] = conversationText });
+            var response = result.GetValue<string>();
             
-            return result.GetValue<string>();
+            // Ensure we have valid JSON
+            try {
+                JsonDocument.Parse(response);
+                return response;
+            } catch (JsonException) {
+                // If not valid JSON, try to extract just the JSON part
+                int start = response.IndexOf('{');
+                int end = response.LastIndexOf('}');
+                
+                if (start >= 0 && end > start) {
+                    string jsonPart = response.Substring(start, end - start + 1);
+                    try {
+                        JsonDocument.Parse(jsonPart);
+                        return jsonPart;
+                    } catch (JsonException) {
+                        // Return default
+                        return "{ \"patientName\": \"unknown\", \"specialty\": \"unknown\", \"dateTime\": \"unknown\", \"reason\": \"unknown\", \"contactInfo\": \"unknown\" }";
+                    }
+                }
+                
+                // Default
+                return "{ \"patientName\": \"unknown\", \"specialty\": \"unknown\", \"dateTime\": \"unknown\", \"reason\": \"unknown\", \"contactInfo\": \"unknown\" }";
+            }
         }
 
         [KernelFunction, Description("Validate appointment details for completeness")]
-        public string ValidateAppointment(
+        public async Task<string> ValidateAppointment(
             [Description("JSON string containing appointment details")]
             string appointmentJson)
         {
@@ -68,8 +90,23 @@ namespace WebChatBot.Plugins
                 if (appointment.Reason == "unknown") missingFields.Add("reason for visit");
                 if (appointment.ContactInfo == "unknown") missingFields.Add("contact information");
 
+                // If specialty is provided, validate that it exists
+                bool specialtyValid = true;
+                if (appointment.Specialty != "unknown")
+                {
+                    specialtyValid = await _appointmentService.SpecialtyExistsAsync(appointment.Specialty);
+                    if (!specialtyValid)
+                    {
+                        return JsonSerializer.Serialize(new { 
+                            isValid = false, 
+                            message = $"The specialty '{appointment.Specialty}' is not available at our clinic. Please choose from our available specialties.",
+                            appointment = appointment
+                        });
+                    }
+                }
+
                 // If no missing fields, appointment is valid
-                if (missingFields.Count == 0)
+                if (missingFields.Count == 0 && specialtyValid)
                 {
                     return JsonSerializer.Serialize(new { 
                         isValid = true, 
@@ -95,30 +132,82 @@ namespace WebChatBot.Plugins
             }
         }
 
-        [KernelFunction, Description("Book an appointment and return confirmation details")]
-        public string BookAppointment(
-            [Description("JSON string containing validated appointment details")]
-            string appointmentJson)
+        [KernelFunction, Description("Check available appointment slots for a specialty")]
+        public async Task<string> CheckAvailability(
+            [Description("The medical specialty to check availability for")]
+            string specialty,
+            [Description("The preferred date (optional)")]
+            string date = "")
         {
             try
             {
-                var appointment = JsonSerializer.Deserialize<AppointmentDetails>(appointmentJson);
+                DateTime? fromDate = null;
+                if (!string.IsNullOrEmpty(date))
+                {
+                    if (DateTime.TryParse(date, out DateTime parsedDate))
+                    {
+                        fromDate = parsedDate;
+                    }
+                }
+
+                var availableSlots = await _appointmentService.GetAvailableSlotsAsync(specialty, fromDate);
                 
-                // Generate a unique appointment ID
-                appointment.Id = Guid.NewGuid().ToString();
-                appointment.Status = "confirmed";
-                appointment.ConfirmationTime = DateTime.UtcNow;
-                
-                // In a real application, save to database
-                _appointments.Add(appointment);
-                
-                // Return confirmation info
+                if (availableSlots.Count == 0)
+                {
+                    return JsonSerializer.Serialize(new {
+                        specialty = specialty,
+                        date = date,
+                        hasAvailability = false,
+                        message = $"No available appointments found for {specialty}" + 
+                                 (fromDate.HasValue ? $" on or after {fromDate.Value.ToString("MMMM d, yyyy")}" : ""),
+                        availableSlots = new List<object>()
+                    });
+                }
+
                 return JsonSerializer.Serialize(new {
-                    success = true,
-                    confirmationCode = appointment.Id.Substring(0, 8).ToUpper(),
-                    message = "Appointment booked successfully.",
-                    appointment = appointment
+                    specialty = specialty,
+                    date = date,
+                    hasAvailability = true,
+                    message = $"Found {availableSlots.Count} available appointments for {specialty}",
+                    availableSlots = availableSlots
                 });
+            }
+            catch (Exception ex)
+            {
+                return JsonSerializer.Serialize(new {
+                    specialty = specialty,
+                    date = date,
+                    hasAvailability = false,
+                    message = $"Error checking availability: {ex.Message}",
+                    availableSlots = new List<object>()
+                });
+            }
+        }
+
+        [KernelFunction, Description("Book an appointment and return confirmation details")]
+        public async Task<string> BookAppointment(
+            [Description("Patient name")]
+            string patientName,
+            [Description("Patient contact information (email or phone)")]
+            string contactInfo,
+            [Description("Appointment slot ID")]
+            int slotId,
+            [Description("Reason for the appointment")]
+            string reason)
+        {
+            try
+            {
+                var request = new AppointmentRequest
+                {
+                    PatientName = patientName,
+                    ContactInfo = contactInfo,
+                    SlotId = slotId,
+                    Reason = reason
+                };
+
+                var result = await _appointmentService.BookAppointmentAsync(request);
+                
+                return JsonSerializer.Serialize(result);
             }
             catch (Exception ex)
             {
@@ -129,60 +218,23 @@ namespace WebChatBot.Plugins
             }
         }
 
-        [KernelFunction, Description("Check available appointment slots for a specialty")]
-        public string CheckAvailability(
-            [Description("The medical specialty to check availability for")]
-            string specialty,
-            [Description("The preferred date (optional)")]
-            string date = "")
+        [KernelFunction, Description("Get appointment details by confirmation code")]
+        public async Task<string> GetAppointmentByCode(
+            [Description("Confirmation code for the appointment")]
+            string confirmationCode)
         {
-            // In a real application, this would query a database
-            // For demo purposes, we'll return mock data
-            
-            var availableSlots = new List<Dictionary<string, string>>();
-            
-            // Generate some mock availability data
-            DateTime startDate = string.IsNullOrEmpty(date) 
-                ? DateTime.Today.AddDays(1) 
-                : DateTime.Parse(date);
-                
-            for (int day = 0; day < 5; day++)
+            try
             {
-                DateTime currentDate = startDate.AddDays(day);
-                if (currentDate.DayOfWeek == DayOfWeek.Saturday || currentDate.DayOfWeek == DayOfWeek.Sunday)
-                    continue;
-                    
-                // Add morning slots
-                availableSlots.Add(new Dictionary<string, string> {
-                    ["date"] = currentDate.ToString("yyyy-MM-dd"),
-                    ["day"] = currentDate.DayOfWeek.ToString(),
-                    ["time"] = "09:00 AM"
-                });
-                
-                availableSlots.Add(new Dictionary<string, string> {
-                    ["date"] = currentDate.ToString("yyyy-MM-dd"),
-                    ["day"] = currentDate.DayOfWeek.ToString(),
-                    ["time"] = "11:30 AM"
-                });
-                
-                // Add afternoon slots
-                availableSlots.Add(new Dictionary<string, string> {
-                    ["date"] = currentDate.ToString("yyyy-MM-dd"),
-                    ["day"] = currentDate.DayOfWeek.ToString(),
-                    ["time"] = "2:00 PM"
-                });
-                
-                availableSlots.Add(new Dictionary<string, string> {
-                    ["date"] = currentDate.ToString("yyyy-MM-dd"),
-                    ["day"] = currentDate.DayOfWeek.ToString(),
-                    ["time"] = "4:30 PM"
+                var result = await _appointmentService.GetAppointmentByCodeAsync(confirmationCode);
+                return JsonSerializer.Serialize(result);
+            }
+            catch (Exception ex)
+            {
+                return JsonSerializer.Serialize(new {
+                    success = false,
+                    message = $"Failed to retrieve appointment: {ex.Message}"
                 });
             }
-            
-            return JsonSerializer.Serialize(new {
-                specialty = specialty,
-                availableSlots = availableSlots
-            });
         }
     }
 }
