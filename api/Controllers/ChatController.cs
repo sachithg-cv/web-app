@@ -4,11 +4,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using WebChatBot.Services;
+using Microsoft.AspNetCore.Cors;
 
 namespace WebChatBot.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableCors("AllowSpecificOrigins")]
     public class ChatController : ControllerBase
     {
         private readonly SemanticKernelService _semanticKernelService;

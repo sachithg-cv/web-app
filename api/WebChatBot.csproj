@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <!-- Keep your existing Semantic Kernel packages -->
+    <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.3.0" />
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.45.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.36.1-alpha" />
     
